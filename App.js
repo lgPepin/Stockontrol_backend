@@ -15,6 +15,10 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+const suppliers = require("./path/suppliers");
+app.use("/api/v1/suppliers", suppliers);
+//app.use("/api/v1/suppliers/create");
+
 // app.get("/api/get", (req, res) => {
 //   const sqlSelect = "SELECT * FROM products";
 //   db.query(sqlSelect, (err, result) => {
