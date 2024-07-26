@@ -17,65 +17,65 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const suppliers = require("./path/suppliers");
 app.use("/api/v1/suppliers", suppliers);
-//app.use("/api/v1/suppliers/create");
 
-// app.get("/api/get", (req, res) => {
-//   const sqlSelect = "SELECT * FROM products";
-//   db.query(sqlSelect, (err, result) => {
-//     res.send(result);
-//   });
-// });
-
-app.get("/api/get", (req, res) => {
+app.get("/api/v1/get", (req, res) => {
   const { searchProductName, searchSupplier, searchCategory } = req.query;
-  const formattedSearchProductName = `%${searchProductName || ""}%`;
-  const formattedSearchSupplier = `%${searchSupplier || ""}%`;
-  const formattedSearchCategory = `%${searchCategory || ""}%`;
 
-  const sqlSelectByName = `
-      SELECT * FROM products
-      WHERE 
-        (product_name ILIKE $1)
-        AND (supplier ILIKE $2)
-        AND (category ILIKE $3)
-    `;
+  const sql = `
+    SELECT p.product_id, p.product_name, p.category, p.stock, p.purchase_price, p.selling_price, p.status, s.supplier_name
+    FROM products p
+    JOIN suppliers s ON p.supplier_id = s.supplier_id
+    WHERE (p.product_name ILIKE $1 OR $1 IS NULL)
+    AND (s.supplier_name ILIKE $2 OR $2 IS NULL)
+    AND (p.category ILIKE $3 OR $3 IS NULL)
+  `;
 
-  db.query(
-    sqlSelectByName,
-    [
-      formattedSearchProductName,
-      formattedSearchSupplier,
-      formattedSearchCategory,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error(err);
-        res
-          .status(500)
-          .send("Un error ha ocurrido en el proceso de búsqueda de producto.");
-      } else {
-        res.send(result.rows);
-      }
+  const params = [
+    `%${searchProductName}%`,
+    `%${searchSupplier}%`,
+    `%${searchCategory}%`,
+  ];
+
+  db.query(sql, params, (err, result) => {
+    if (err) {
+      console.error("Error a la recuperación de productos:", err);
+      return res.status(500).send("Error a la recuperación de productos.");
     }
-  );
+    res.json(result.rows);
+  });
 });
 
-app.post("/api/insert", (req, res) => {
+app.post("/api/v1/create", (req, res) => {
   const productName = req.body.productName;
-  const supplier = req.body.supplier;
+  const supplierId = req.body.supplierId;
   const category = req.body.category;
   const stock = req.body.stock;
   const purchasePrice = req.body.purchasePrice;
   const sellingPrice = req.body.sellingPrice;
   const status = req.body.status;
 
-  const sqlInsert =
-    "INSERT INTO products (product_name, supplier, category, stock, purchase_price, selling_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7)";
+  if (
+    !productName ||
+    !supplierId ||
+    !category ||
+    !stock ||
+    !purchasePrice ||
+    !sellingPrice ||
+    !status
+  ) {
+    return res.status(400).send("Todos los campos deben ser llenados");
+  }
+
+  const sqlInsert = `
+    INSERT INTO products (product_name, supplier_id, category, stock, purchase_price, selling_price, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `;
+
   db.query(
     sqlInsert,
     [
       productName,
-      supplier,
+      supplierId,
       category,
       stock,
       purchasePrice,
@@ -83,15 +83,20 @@ app.post("/api/insert", (req, res) => {
       status,
     ],
     (err, result) => {
-      console.log(result);
+      if (err) {
+        console.error("Error a la creación del producto:", err);
+        return res.status(500).send("EError a la creación del producto.");
+      } else {
+        res.status(201).send("Producto creado con éxito.");
+      }
     }
   );
 });
 
-app.put("/api/update/:product_id", (req, res) => {
+app.put("/api/v1/update/:product_id", (req, res) => {
   const {
     product_name,
-    supplier,
+    supplier_id,
     category,
     stock,
     purchase_price,
@@ -100,13 +105,25 @@ app.put("/api/update/:product_id", (req, res) => {
   } = req.body;
   const product_id = req.params.product_id;
 
+  if (
+    !product_name ||
+    !supplier_id ||
+    !category ||
+    !stock ||
+    !purchase_price ||
+    !selling_price ||
+    !status
+  ) {
+    return res.status(400).send("Todos los campos deben ser llenados.");
+  }
+
   const sqlUpdate =
-    "UPDATE products SET product_name = $1, supplier = $2, category = $3, stock = $4, purchase_price = $5, selling_price = $6, status = $7 WHERE product_id = $8";
+    "UPDATE products SET product_name = $1, supplier_id = $2, category = $3, stock = $4, purchase_price = $5, selling_price = $6, status = $7 WHERE product_id = $8";
   db.query(
     sqlUpdate,
     [
       product_name,
-      supplier,
+      supplier_id,
       category,
       stock,
       purchase_price,
@@ -117,20 +134,42 @@ app.put("/api/update/:product_id", (req, res) => {
     (err, result) => {
       if (err) {
         console.log(err);
-        res.status(500).send("Erreur lors de la mise à jour du produit");
+        res.status(500).send("Error al actualizar el producto");
       } else {
-        res.status(200).send("Produit mis à jour avec succès");
+        res.status(200).send("Producto actualizado con éxito");
       }
     }
   );
 });
 
-app.delete("/api/delete/:product_name", (req, res) => {
+app.delete("/api/v1/delete/:product_name", (req, res) => {
   const name = req.params.product_name;
   const sqlDelete = "DELETE FROM products WHERE product_name = $1";
+
   db.query(sqlDelete, [name], (err, result) => {
-    if (err) console.log(err);
+    if (err) {
+      console.log(err);
+      return res.status(500).json({ message: "Error al eliminar el producto" });
+    }
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+    res
+      .status(200)
+      .json({ message: `El Producto '${name}' ha sido eliminado con éxito` });
   });
+});
+
+app.get("/api/v1/list/suppliers", async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT supplier_id, supplier_name FROM suppliers"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
 });
 
 app.listen(8080, () => {
