@@ -9,17 +9,6 @@ const db = new Pool({
   database: "Stockontrol_DB",
 });
 
-// router.get("/", (req, res) => {
-//   res.status(200).json({ message: "Tous les fournisseurs" });
-// });
-
-// router.get("/:id", (req, res) => {
-//   req.params.id;
-//   res.status(200).json({
-//     id: req.params.id,
-//   });
-// });
-
 router.get("/get", (req, res) => {
   const { searchSupplierName } = req.query;
   const formattedSearchSupplierName = `%${searchSupplierName || ""}%`;
@@ -46,16 +35,16 @@ router.post("/create", (req, res) => {
   const supplierName = req.body.supplierName;
 
   if (!supplierName) {
-    return res.status(400).send("Supplier name is required");
+    return res.status(400).send("El proveedor debe tener un nombre");
   }
 
   const sqlInsert = "INSERT INTO suppliers (supplier_name) VALUES ($1)";
   db.query(sqlInsert, [supplierName], (err, result) => {
     if (err) {
-      console.error("Error executing query", err.stack);
-      return res.status(500).send("Error creating supplier");
+      console.error("Error en la execución del query", err.stack);
+      return res.status(500).send("Error de creación del proveedor");
     }
-    return res.status(200).send("Supplier created successfully");
+    return res.status(200).send("Proveedor creado con éxito");
   });
 });
 
@@ -68,9 +57,9 @@ router.put("/update/:supplier_id", (req, res) => {
   db.query(sqlUpdate, [supplier_name, supplier_id], (err, result) => {
     if (err) {
       console.log(err);
-      res.status(500).send("Erreur lors de la mise à jour du produit");
+      res.status(500).send("Error en la actualización del proveedor");
     } else {
-      res.status(200).send("Produit mis à jour avec succès");
+      res.status(200).send("El proveedor ha sido actualizado con éxito");
     }
   });
 });
@@ -80,12 +69,12 @@ router.delete("/delete/:supplier_name", (req, res) => {
   const sqlDelete = "DELETE FROM suppliers WHERE supplier_name = $1";
   db.query(sqlDelete, [name], (err, result) => {
     if (err) {
-      console.error("Error deleting supplier:", err);
-      res.status(500).send("Erreur lors de la suppression du fournisseur.");
+      console.error("Error a la supresión del proveedor:", err);
+      res.status(500).send("Error a la supresión del proveedor.");
     } else {
       res
         .status(200)
-        .send({ message: `Le fournisseur ${name} a été éliminé avec succès!` });
+        .send({ message: `El proveedor ${name} ha sido eliminado con éxito!` });
     }
   });
 });
