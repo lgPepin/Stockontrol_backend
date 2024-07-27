@@ -33,35 +33,101 @@ router.get("/get", (req, res) => {
 
 router.post("/create", (req, res) => {
   const supplierName = req.body.supplierName;
+  const identificationNumber = req.body.identificationNumber;
+  const address = req.body.address;
+  const phone = req.body.phone;
+  const contactName = req.body.contactName;
+  const orderDay = req.body.orderDay;
+  const deliveryDay = req.body.deliveryDay;
+  const status = req.body.status;
 
-  if (!supplierName) {
-    return res.status(400).send("El proveedor debe tener un nombre");
+  if (
+    !supplierName ||
+    !identificationNumber ||
+    !address ||
+    !phone ||
+    !contactName ||
+    !orderDay ||
+    !deliveryDay ||
+    !status
+  ) {
+    return res.status(400).send("Todos los campos deben ser llenados");
   }
 
-  const sqlInsert = "INSERT INTO suppliers (supplier_name) VALUES ($1)";
-  db.query(sqlInsert, [supplierName], (err, result) => {
-    if (err) {
-      console.error("Error en la execución del query", err.stack);
-      return res.status(500).send("Error de creación del proveedor");
+  const sqlInsert =
+    "INSERT INTO suppliers (supplier_name, identification_number, address, phone, contact_name, order_day, delivery_day, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
+  db.query(
+    sqlInsert,
+    [
+      supplierName,
+      identificationNumber,
+      address,
+      phone,
+      contactName,
+      orderDay,
+      deliveryDay,
+      status,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error("Error en la execución del query", err.stack);
+        return res.status(500).send("Error de creación del proveedor");
+      }
+      return res.status(200).send("Proveedor creado con éxito");
     }
-    return res.status(200).send("Proveedor creado con éxito");
-  });
+  );
 });
 
 router.put("/update/:supplier_id", (req, res) => {
-  const { supplier_name } = req.body;
+  const {
+    supplier_name,
+    identification_number,
+    address,
+    phone,
+    contact_name,
+    order_day,
+    delivery_day,
+    status,
+  } = req.body;
   const supplier_id = req.params.supplier_id;
 
+  if (
+    !supplier_name ||
+    !identification_number ||
+    !address ||
+    !phone ||
+    !contact_name ||
+    !order_day ||
+    !delivery_day ||
+    !status
+  ) {
+    return res.status(400).send("Todos los campos deben ser llenados.");
+  }
+
   const sqlUpdate =
-    "UPDATE suppliers SET supplier_name = $1 WHERE supplier_id = $2";
-  db.query(sqlUpdate, [supplier_name, supplier_id], (err, result) => {
-    if (err) {
-      console.log(err);
-      res.status(500).send("Error en la actualización del proveedor");
-    } else {
-      res.status(200).send("El proveedor ha sido actualizado con éxito");
+    "UPDATE suppliers SET supplier_name = $1, identification_number = $2, address = $3, phone = $4, contact_name = $5, order_day = $6, delivery_day = $7, status = $8 WHERE supplier_id = $9";
+  db.query(
+    sqlUpdate,
+    [
+      supplier_name,
+      identification_number,
+      address,
+      phone,
+      contact_name,
+      order_day,
+      delivery_day,
+      status,
+      supplier_id,
+    ],
+    (err, result) => {
+      if (err) {
+        console.log(err);
+        res.status(500).send("Error en la actualización del proveedor");
+      } else {
+        res.status(200).send("El proveedor ha sido actualizado con éxito");
+      }
     }
-  });
+  );
 });
 
 router.delete("/delete/:supplier_name", (req, res) => {
