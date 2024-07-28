@@ -19,17 +19,20 @@ const suppliers = require("./path/suppliers");
 app.use("/api/v1/suppliers", suppliers);
 const categories = require("./path/categories");
 app.use("/api/v1/categories", categories);
+const users = require("./path/users");
+app.use("/api/v1/users", users);
 
 app.get("/api/v1/get", (req, res) => {
   const { searchProductName, searchSupplier, searchCategory } = req.query;
 
   const sql = `
-    SELECT p.product_id, p.product_name, p.category, p.stock, p.purchase_price, p.selling_price, p.status, s.supplier_name
+    SELECT p.product_id, p.product_name, c.category_name, p.stock, p.purchase_price, p.selling_price, p.status, s.supplier_name
     FROM products p
     JOIN suppliers s ON p.supplier_id = s.supplier_id
+    JOIN categories c ON p.category_id = c.category_id
     WHERE (p.product_name ILIKE $1 OR $1 IS NULL)
     AND (s.supplier_name ILIKE $2 OR $2 IS NULL)
-    AND (p.category ILIKE $3 OR $3 IS NULL)
+    AND (c.category_name ILIKE $3 OR $3 IS NULL)
   `;
 
   const params = [
@@ -50,7 +53,7 @@ app.get("/api/v1/get", (req, res) => {
 app.post("/api/v1/create", (req, res) => {
   const productName = req.body.productName;
   const supplierId = req.body.supplierId;
-  const category = req.body.category;
+  const categoryId = req.body.categoryId;
   const stock = req.body.stock;
   const purchasePrice = req.body.purchasePrice;
   const sellingPrice = req.body.sellingPrice;
@@ -59,7 +62,7 @@ app.post("/api/v1/create", (req, res) => {
   if (
     !productName ||
     !supplierId ||
-    !category ||
+    !categoryId ||
     !stock ||
     !purchasePrice ||
     !sellingPrice ||
@@ -69,7 +72,7 @@ app.post("/api/v1/create", (req, res) => {
   }
 
   const sqlInsert = `
-    INSERT INTO products (product_name, supplier_id, category, stock, purchase_price, selling_price, status)
+    INSERT INTO products (product_name, supplier_id, category_id, stock, purchase_price, selling_price, status)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
   `;
 
@@ -78,7 +81,7 @@ app.post("/api/v1/create", (req, res) => {
     [
       productName,
       supplierId,
-      category,
+      categoryId,
       stock,
       purchasePrice,
       sellingPrice,
@@ -99,7 +102,7 @@ app.put("/api/v1/update/:product_id", (req, res) => {
   const {
     product_name,
     supplier_id,
-    category,
+    category_id,
     stock,
     purchase_price,
     selling_price,
@@ -110,7 +113,7 @@ app.put("/api/v1/update/:product_id", (req, res) => {
   if (
     !product_name ||
     !supplier_id ||
-    !category ||
+    !category_id ||
     !stock ||
     !purchase_price ||
     !selling_price ||
@@ -120,13 +123,13 @@ app.put("/api/v1/update/:product_id", (req, res) => {
   }
 
   const sqlUpdate =
-    "UPDATE products SET product_name = $1, supplier_id = $2, category = $3, stock = $4, purchase_price = $5, selling_price = $6, status = $7 WHERE product_id = $8";
+    "UPDATE products SET product_name = $1, supplier_id = $2, category_id = $3, stock = $4, purchase_price = $5, selling_price = $6, status = $7 WHERE product_id = $8";
   db.query(
     sqlUpdate,
     [
       product_name,
       supplier_id,
-      category,
+      category_id,
       stock,
       purchase_price,
       selling_price,
@@ -166,6 +169,18 @@ app.get("/api/v1/list/suppliers", async (req, res) => {
   try {
     const result = await db.query(
       "SELECT supplier_id, supplier_name FROM suppliers"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
+app.get("/api/v1/list/categories", async (req, res) => {
+  try {
+    const result = await db.query(
+      "SELECT category_id, category_name FROM categories"
     );
     res.json(result.rows);
   } catch (err) {
