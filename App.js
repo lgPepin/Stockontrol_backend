@@ -17,6 +17,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 const suppliers = require("./path/suppliers");
 app.use("/api/v1/suppliers", suppliers);
+const categories = require("./path/categories");
+app.use("/api/v1/categories", categories);
 
 app.get("/api/v1/get", (req, res) => {
   const { searchProductName, searchSupplier, searchCategory } = req.query;
