@@ -14,7 +14,9 @@ router.get("/get", (req, res) => {
   const formattedSearchSupplierName = `%${searchSupplierName || ""}%`;
 
   const sqlSelectByName = `
-      SELECT * FROM suppliers
+      SELECT s.supplier_id, s.supplier_name, s.identification_number, s.address, s.phone, s.contact_name, s.order_day, s.delivery_day, st.status
+      FROM suppliers s
+      JOIN status st ON s.status_id = st.status_id
       WHERE 
         supplier_name ILIKE $1
     `;
@@ -39,7 +41,7 @@ router.post("/create", (req, res) => {
   const contactName = req.body.contactName;
   const orderDay = req.body.orderDay;
   const deliveryDay = req.body.deliveryDay;
-  const status = req.body.status;
+  const statusId = req.body.statusId;
 
   if (
     !supplierName ||
@@ -49,13 +51,13 @@ router.post("/create", (req, res) => {
     !contactName ||
     !orderDay ||
     !deliveryDay ||
-    !status
+    !statusId
   ) {
     return res.status(400).send("Todos los campos deben ser llenados");
   }
 
   const sqlInsert =
-    "INSERT INTO suppliers (supplier_name, identification_number, address, phone, contact_name, order_day, delivery_day, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
+    "INSERT INTO suppliers (supplier_name, identification_number, address, phone, contact_name, order_day, delivery_day, status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
   db.query(
     sqlInsert,
     [
@@ -66,7 +68,7 @@ router.post("/create", (req, res) => {
       contactName,
       orderDay,
       deliveryDay,
-      status,
+      statusId,
     ],
     (err, result) => {
       if (err) {
@@ -87,7 +89,7 @@ router.put("/update/:supplier_id", (req, res) => {
     contact_name,
     order_day,
     delivery_day,
-    status,
+    status_id,
   } = req.body;
   const supplier_id = req.params.supplier_id;
 
@@ -99,13 +101,13 @@ router.put("/update/:supplier_id", (req, res) => {
     !contact_name ||
     !order_day ||
     !delivery_day ||
-    !status
+    !status_id
   ) {
     return res.status(400).send("Todos los campos deben ser llenados.");
   }
 
   const sqlUpdate =
-    "UPDATE suppliers SET supplier_name = $1, identification_number = $2, address = $3, phone = $4, contact_name = $5, order_day = $6, delivery_day = $7, status = $8 WHERE supplier_id = $9";
+    "UPDATE suppliers SET supplier_name = $1, identification_number = $2, address = $3, phone = $4, contact_name = $5, order_day = $6, delivery_day = $7, status_id = $8 WHERE supplier_id = $9";
   db.query(
     sqlUpdate,
     [
@@ -116,7 +118,7 @@ router.put("/update/:supplier_id", (req, res) => {
       contact_name,
       order_day,
       delivery_day,
-      status,
+      status_id,
       supplier_id,
     ],
     (err, result) => {
