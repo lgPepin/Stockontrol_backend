@@ -23,16 +23,21 @@ const users = require("./path/users");
 app.use("/api/v1/users", users);
 
 app.get("/api/v1/get", (req, res) => {
-  const { searchProductName, searchSupplier, searchCategory } = req.query;
+  const {
+    searchProductName = "",
+    searchSupplier = "",
+    searchCategory = "",
+  } = req.query;
 
   const sql = `
-    SELECT p.product_id, p.product_name, c.category_name, p.stock, p.purchase_price, p.selling_price, p.status, s.supplier_name
+    SELECT p.product_id, p.product_name, c.category_name, p.stock, p.purchase_price, p.selling_price, st.status, s.supplier_name
     FROM products p
     JOIN suppliers s ON p.supplier_id = s.supplier_id
     JOIN categories c ON p.category_id = c.category_id
-    WHERE (p.product_name ILIKE $1 OR $1 IS NULL)
-    AND (s.supplier_name ILIKE $2 OR $2 IS NULL)
-    AND (c.category_name ILIKE $3 OR $3 IS NULL)
+    JOIN status st ON p.status_id = st.status_id
+    WHERE (p.product_name ILIKE $1)
+    AND (s.supplier_name ILIKE $2)
+    AND (c.category_name ILIKE $3)
   `;
 
   const params = [
@@ -57,7 +62,7 @@ app.post("/api/v1/create", (req, res) => {
   const stock = req.body.stock;
   const purchasePrice = req.body.purchasePrice;
   const sellingPrice = req.body.sellingPrice;
-  const status = req.body.status;
+  const statusId = req.body.statusId;
 
   if (
     !productName ||
@@ -66,13 +71,13 @@ app.post("/api/v1/create", (req, res) => {
     !stock ||
     !purchasePrice ||
     !sellingPrice ||
-    !status
+    !statusId
   ) {
     return res.status(400).send("Todos los campos deben ser llenados");
   }
 
   const sqlInsert = `
-    INSERT INTO products (product_name, supplier_id, category_id, stock, purchase_price, selling_price, status)
+    INSERT INTO products (product_name, supplier_id, category_id, stock, purchase_price, selling_price, status_id)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
   `;
 
@@ -85,7 +90,7 @@ app.post("/api/v1/create", (req, res) => {
       stock,
       purchasePrice,
       sellingPrice,
-      status,
+      statusId,
     ],
     (err, result) => {
       if (err) {
@@ -106,7 +111,7 @@ app.put("/api/v1/update/:product_id", (req, res) => {
     stock,
     purchase_price,
     selling_price,
-    status,
+    status_id,
   } = req.body;
   const product_id = req.params.product_id;
 
@@ -117,13 +122,13 @@ app.put("/api/v1/update/:product_id", (req, res) => {
     !stock ||
     !purchase_price ||
     !selling_price ||
-    !status
+    !status_id
   ) {
     return res.status(400).send("Todos los campos deben ser llenados.");
   }
 
   const sqlUpdate =
-    "UPDATE products SET product_name = $1, supplier_id = $2, category_id = $3, stock = $4, purchase_price = $5, selling_price = $6, status = $7 WHERE product_id = $8";
+    "UPDATE products SET product_name = $1, supplier_id = $2, category_id = $3, stock = $4, purchase_price = $5, selling_price = $6, status_id = $7 WHERE product_id = $8";
   db.query(
     sqlUpdate,
     [
@@ -133,7 +138,7 @@ app.put("/api/v1/update/:product_id", (req, res) => {
       stock,
       purchase_price,
       selling_price,
-      status,
+      status_id,
       product_id,
     ],
     (err, result) => {
@@ -147,21 +152,63 @@ app.put("/api/v1/update/:product_id", (req, res) => {
   );
 });
 
-app.delete("/api/v1/delete/:product_name", (req, res) => {
-  const name = req.params.product_name;
-  const sqlDelete = "DELETE FROM products WHERE product_name = $1";
+// app.delete("/api/v1/delete/:product_name", (req, res) => {
+//   const name = req.params.product_name;
+//   const sqlDelete = "DELETE FROM products WHERE product_name = $1";
 
-  db.query(sqlDelete, [name], (err, result) => {
+//   db.query(sqlDelete, [name], (err, result) => {
+//     if (err) {
+//       console.log(err);
+//       return res.status(500).json({ message: "Error al eliminar el producto" });
+//     }
+//     if (result.rowCount === 0) {
+//       return res.status(404).json({ message: "Producto no encontrado" });
+//     }
+//     res
+//       .status(200)
+//       .json({ message: `El Producto '${name}' ha sido eliminado con éxito` });
+//   });
+// });
+
+app.delete("/api/v1/delete/:product_id", (req, res) => {
+  const id = parseInt(req.params.product_id, 10);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ message: "Invalid product ID" });
+  }
+
+  // Requête pour récupérer le nom du produit avant de le supprimer
+  const sqlSelect = "SELECT product_name FROM products WHERE product_id = $1";
+  db.query(sqlSelect, [id], (err, selectResult) => {
     if (err) {
       console.log(err);
-      return res.status(500).json({ message: "Error al eliminar el producto" });
+      return res
+        .status(500)
+        .json({ message: "Error al recuperar el producto" });
     }
-    if (result.rowCount === 0) {
+
+    // Vérifie si le produit existe
+    if (selectResult.rowCount === 0) {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
-    res
-      .status(200)
-      .json({ message: `El Producto '${name}' ha sido eliminado con éxito` });
+
+    const productName = selectResult.rows[0].product_name;
+
+    // Suppression du produit
+    const sqlDelete = "DELETE FROM products WHERE product_id = $1";
+    db.query(sqlDelete, [id], (err, deleteResult) => {
+      if (err) {
+        console.log(err);
+        return res
+          .status(500)
+          .json({ message: "Error al eliminar el producto" });
+      }
+
+      // Confirmation de la suppression avec le nom du produit
+      res.status(200).json({
+        message: `El Producto '${productName}' ha sido eliminado con éxito`,
+      });
+    });
   });
 });
 
@@ -182,6 +229,16 @@ app.get("/api/v1/list/categories", async (req, res) => {
     const result = await db.query(
       "SELECT category_id, category_name FROM categories"
     );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
+app.get("/api/v1/list/statuses", async (req, res) => {
+  try {
+    const result = await db.query("SELECT status_id, status FROM status");
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);
