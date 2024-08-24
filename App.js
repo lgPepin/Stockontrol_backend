@@ -21,6 +21,8 @@ const categories = require("./path/categories");
 app.use("/api/v1/categories", categories);
 const users = require("./path/users");
 app.use("/api/v1/users", users);
+const listControlStock = require("./path/listsControlStock");
+app.use("/api/v1/listsControlStock", listControlStock);
 
 app.get("/api/v1/get", (req, res) => {
   const {
@@ -95,7 +97,7 @@ app.post("/api/v1/create", (req, res) => {
     (err, result) => {
       if (err) {
         console.error("Error a la creación del producto:", err);
-        return res.status(500).send("EError a la creación del producto.");
+        return res.status(500).send("Error a la creación del producto.");
       } else {
         res.status(201).send("Producto creado con éxito.");
       }
@@ -152,24 +154,6 @@ app.put("/api/v1/update/:product_id", (req, res) => {
   );
 });
 
-// app.delete("/api/v1/delete/:product_name", (req, res) => {
-//   const name = req.params.product_name;
-//   const sqlDelete = "DELETE FROM products WHERE product_name = $1";
-
-//   db.query(sqlDelete, [name], (err, result) => {
-//     if (err) {
-//       console.log(err);
-//       return res.status(500).json({ message: "Error al eliminar el producto" });
-//     }
-//     if (result.rowCount === 0) {
-//       return res.status(404).json({ message: "Producto no encontrado" });
-//     }
-//     res
-//       .status(200)
-//       .json({ message: `El Producto '${name}' ha sido eliminado con éxito` });
-//   });
-// });
-
 app.delete("/api/v1/delete/:product_id", (req, res) => {
   const id = parseInt(req.params.product_id, 10);
 
@@ -177,7 +161,6 @@ app.delete("/api/v1/delete/:product_id", (req, res) => {
     return res.status(400).json({ message: "Invalid product ID" });
   }
 
-  // Requête pour récupérer le nom du produit avant de le supprimer
   const sqlSelect = "SELECT product_name FROM products WHERE product_id = $1";
   db.query(sqlSelect, [id], (err, selectResult) => {
     if (err) {
@@ -187,14 +170,12 @@ app.delete("/api/v1/delete/:product_id", (req, res) => {
         .json({ message: "Error al recuperar el producto" });
     }
 
-    // Vérifie si le produit existe
     if (selectResult.rowCount === 0) {
       return res.status(404).json({ message: "Producto no encontrado" });
     }
 
     const productName = selectResult.rows[0].product_name;
 
-    // Suppression du produit
     const sqlDelete = "DELETE FROM products WHERE product_id = $1";
     db.query(sqlDelete, [id], (err, deleteResult) => {
       if (err) {
@@ -204,7 +185,6 @@ app.delete("/api/v1/delete/:product_id", (req, res) => {
           .json({ message: "Error al eliminar el producto" });
       }
 
-      // Confirmation de la suppression avec le nom du produit
       res.status(200).json({
         message: `El Producto '${productName}' ha sido eliminado con éxito`,
       });
@@ -243,6 +223,30 @@ app.get("/api/v1/list/statuses", async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
+  }
+});
+
+app.get("/api/v1/checkName", async (req, res) => {
+  const { name } = req.query;
+
+  console.log("Checking name:", name);
+
+  try {
+    const result = await db.query(
+      "SELECT COUNT(*) FROM stock_control_lists WHERE LOWER(REGEXP_REPLACE(stock_control_list_name, '\\s+', '', 'g')) = LOWER(REGEXP_REPLACE($1, '\\s+', '', 'g'))",
+      [name]
+    );
+
+    const count = parseInt(result.rows[0].count, 10);
+
+    if (count > 0) {
+      return res.status(200).json({ isUnique: false });
+    } else {
+      return res.status(200).json({ isUnique: true });
+    }
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
