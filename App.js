@@ -23,6 +23,10 @@ const users = require("./path/users");
 app.use("/api/v1/users", users);
 const listControlStock = require("./path/listsControlStock");
 app.use("/api/v1/listsControlStock", listControlStock);
+const listNegativeStock = require("./path/listNegativeStock");
+app.use("/api/v1/listNegativeStock", listNegativeStock);
+const loadData = require("./path/loadData");
+app.use("/api/v1/loadData", loadData);
 
 app.get("/api/v1/get", (req, res) => {
   const {
@@ -219,6 +223,16 @@ app.get("/api/v1/list/categories", async (req, res) => {
 app.get("/api/v1/list/statuses", async (req, res) => {
   try {
     const result = await db.query("SELECT status_id, status FROM status");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
+app.get("/api/v1/list/roles", async (req, res) => {
+  try {
+    const result = await db.query("SELECT role_id, role FROM roles");
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);
