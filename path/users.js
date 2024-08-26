@@ -14,9 +14,10 @@ router.get("/get", (req, res) => {
   const formattedSearchUserLastName = `%${searchUserLastName || ""}%`;
 
   const sqlSelectByName = `
-      SELECT u.user_id, u.user_lastname, u.user_firstname, u.role, st.status
+      SELECT u.user_id, u.user_lastname, u.user_firstname, r.role, st.status
       FROM users u
-      JOIN status st ON u.status_id = st.status_id 
+      JOIN status st ON u.status_id = st.status_id
+      JOIN roles r ON u.role_id = r.role_id
       WHERE 
       user_lastname ILIKE $1
     `;
@@ -36,18 +37,18 @@ router.get("/get", (req, res) => {
 router.post("/create", (req, res) => {
   const userLastName = req.body.userLastName;
   const userFirstName = req.body.userFirstName;
-  const role = req.body.role;
+  const roleId = req.body.roleId;
   const statusId = req.body.statusId;
 
-  if (!userLastName || !userFirstName || !role || !statusId) {
+  if (!userLastName || !userFirstName || !roleId || !statusId) {
     return res.status(400).send("Todos los campos deben ser llenados");
   }
 
   const sqlInsert =
-    "INSERT INTO users (user_lastname, user_firstname, role, status_id) VALUES ($1, $2, $3, $4)";
+    "INSERT INTO users (user_lastname, user_firstname, role_id, status_id) VALUES ($1, $2, $3, $4)";
   db.query(
     sqlInsert,
-    [userLastName, userFirstName, role, statusId],
+    [userLastName, userFirstName, roleId, statusId],
     (err, result) => {
       if (err) {
         console.error("Error en la execución del query", err.stack);
@@ -59,18 +60,18 @@ router.post("/create", (req, res) => {
 });
 
 router.put("/update/:user_id", (req, res) => {
-  const { user_lastname, user_firstname, role, status_id } = req.body;
+  const { user_lastname, user_firstname, role_id, status_id } = req.body;
   const user_id = req.params.user_id;
 
-  if (!user_lastname || !user_firstname || !role || !status_id) {
+  if (!user_lastname || !user_firstname || !role_id || !status_id) {
     return res.status(400).send("Todos los campos deben ser llenados.");
   }
 
   const sqlUpdate =
-    "UPDATE users SET user_lastname = $1, user_firstname = $2, role = $3, status_id = $4 WHERE user_id = $5";
+    "UPDATE users SET user_lastname = $1, user_firstname = $2, role_id = $3, status_id = $4 WHERE user_id = $5";
   db.query(
     sqlUpdate,
-    [user_lastname, user_firstname, role, status_id, user_id],
+    [user_lastname, user_firstname, role_id, status_id, user_id],
     (err, result) => {
       if (err) {
         console.log(err);
