@@ -34,7 +34,7 @@ router.get("/get", (req, res) => {
 });
 
 router.post("/create", (req, res) => {
-  const supplierName = req.body.supplierName;
+  const supplierName = req.body.supplierName.toUpperCase();
   const identificationNumber = req.body.identificationNumber;
   const address = req.body.address;
   const phone = req.body.phone;
@@ -81,16 +81,14 @@ router.post("/create", (req, res) => {
 });
 
 router.put("/update/:supplier_id", (req, res) => {
-  const {
-    supplier_name,
-    identification_number,
-    address,
-    phone,
-    contact_name,
-    order_day,
-    delivery_day,
-    status_id,
-  } = req.body;
+  const supplier_name = req.body.supplier_name.toUpperCase();
+  const identification_number = req.body.identification_number;
+  const address = req.body.address;
+  const phone = req.body.phone;
+  const contact_name = req.body.contact_name;
+  const order_day = req.body.order_day;
+  const delivery_day = req.body.delivery_day;
+  const status_id = req.body.status_id;
   const supplier_id = req.params.supplier_id;
 
   if (
@@ -130,6 +128,35 @@ router.put("/update/:supplier_id", (req, res) => {
       }
     }
   );
+});
+
+router.patch("/update-products/:supplier_name", (req, res) => {
+  const name = req.params.supplier_name;
+
+  const sqlUpdateProducts = `
+    UPDATE products
+    SET supplier_id = (
+      SELECT supplier_id 
+      FROM suppliers 
+      WHERE supplier_name = 'Proveedor no conocido'
+    )
+    WHERE supplier_id = (
+      SELECT supplier_id 
+      FROM suppliers 
+      WHERE supplier_name = $1
+    )
+  `;
+
+  db.query(sqlUpdateProducts, [name], (err, result) => {
+    if (err) {
+      console.error("Error al actualizar productos:", err);
+      return res.status(500).send("Error al actualizar productos.");
+    } else {
+      return res.status(200).send({
+        message: `Los productos asociados al proveedor ${name} han sido actualizados.`,
+      });
+    }
+  });
 });
 
 router.delete("/delete/:supplier_name", (req, res) => {

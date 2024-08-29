@@ -32,7 +32,7 @@ router.get("/get", (req, res) => {
 });
 
 router.post("/create", (req, res) => {
-  const categoryName = req.body.categoryName;
+  const categoryName = req.body.categoryName.toUpperCase();
 
   if (!categoryName) {
     return res.status(400).send("Todos los campos deben ser llenados");
@@ -49,7 +49,7 @@ router.post("/create", (req, res) => {
 });
 
 router.put("/update/:category_id", (req, res) => {
-  const { category_name } = req.body;
+  const category_name = req.body.category_name.toUpperCase();
   const category_id = req.params.category_id;
 
   if (!category_name) {
@@ -64,6 +64,35 @@ router.put("/update/:category_id", (req, res) => {
       res.status(500).send("Error en la actualización de la categoria");
     } else {
       res.status(200).send("La categoria ha sido actualizado con éxito");
+    }
+  });
+});
+
+router.patch("/update-products/:category_name", (req, res) => {
+  const name = req.params.category_name;
+
+  const sqlUpdateProducts = `
+    UPDATE products
+    SET category_id = (
+      SELECT category_id 
+      FROM categories
+      WHERE category_name = 'No hay datos'
+    )
+    WHERE category_id = (
+      SELECT category_id 
+      FROM categories
+      WHERE category_name = $1
+    )
+  `;
+
+  db.query(sqlUpdateProducts, [name], (err, result) => {
+    if (err) {
+      console.error("Error al actualizar productos:", err);
+      return res.status(500).send("Error al actualizar productos.");
+    } else {
+      return res.status(200).send({
+        message: `Los productos asociados al proveedor ${name} han sido actualizados.`,
+      });
     }
   });
 });
