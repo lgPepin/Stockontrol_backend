@@ -243,41 +243,6 @@ router.delete("/delete/:stock_control_list_id", (req, res) => {
   });
 });
 
-//-------------------------------------------------------------------------
-
-// router.patch("/refreshList/:id", async (req, res) => {
-//   const { id } = req.params;
-
-//   try {
-//     // Récupération des produits associés à la liste de contrôle de stock
-//     const productsResult = await db.query(
-//       `SELECT p.product_id, p.stock AS product_stock, pscl.stock_system
-//        FROM products p
-//        JOIN products_stock_control_lists pscl
-//        ON p.product_id = pscl.product_id
-//        WHERE pscl.stock_control_list_id = $1 FOR UPDATE`,
-//       [id]
-//     );
-
-//     // Comparer et mettre à jour stock_system
-//     for (const product of productsResult.rows) {
-//       if (product.stock_system !== product.product_stock) {
-//         await db.query(
-//           `UPDATE products_stock_control_lists
-//            SET stock_system = $1
-//            WHERE product_id = $2 AND stock_control_list_id = $3`,
-//           [product.product_stock, product.product_id, id]
-//         );
-//       }
-//     }
-
-//     res.status(200).json({ message: "Quantités mises à jour avec succès." });
-//   } catch (error) {
-//     console.error("Erreur lors de la mise à jour des quantités :", error);
-//     res.status(500).json({ message: "Erreur serveur." });
-//   }
-// });
-
 router.patch("/activate/:id", async (req, res) => {
   const { id } = req.params;
   const newStatusName = "Activada";
@@ -393,11 +358,6 @@ router.put("/terminate/:list_id", async (req, res) => {
       );
 
       const stock_system = stockRows[0]?.stock_system;
-
-      console.log("Comparacion stock_system y stock_real :", {
-        stock_system,
-        stock_real,
-      });
 
       if (stock_system !== stock_real) {
         await db.query(

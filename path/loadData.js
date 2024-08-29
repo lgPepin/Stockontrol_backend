@@ -9,146 +9,167 @@ const pool = new Pool({
   database: "Stockontrol_DB",
 });
 
-router.post("/loadSupplier", async (req, res) => {
-  const suppliers = req.body; // Liste des fournisseurs avec leurs noms et statuts
+router.delete("/deleteSuppliers", async (req, res) => {
+  const client = await pool.connect();
 
   try {
-    // Préparez une transaction
-    await pool.query("BEGIN");
+    await client.query("BEGIN");
 
-    // Insérez les fournisseurs, en utilisant status_id au lieu de status
-    const insertSuppliers = suppliers.map(async (supplier) => {
-      // Assurez-vous que le status fourni existe dans la table status
-      const statusResult = await pool.query(
-        "SELECT status_id FROM status WHERE status = $1",
-        [supplier.status]
-      );
-      const statusId =
-        statusResult.rows.length > 0 ? statusResult.rows[0].status_id : null;
+    const keepSupplierQuery =
+      "SELECT supplier_id FROM suppliers WHERE supplier_name = $1";
+    const keepSupplierResult = await client.query(keepSupplierQuery, [
+      "Proveedor no conocido",
+    ]);
 
-      if (statusId) {
-        await pool.query(
-          `INSERT INTO suppliers (supplier_name, identification_number, address, phone, contact_name, order_day, delivery_day, status_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (supplier_name) DO NOTHING`,
-          [
-            supplier.supplier_name,
-            supplier.identification_number || 0, // Valeur par défaut si non spécifiée
-            supplier.address || "No existe data",
-            supplier.phone || "No existe data",
-            supplier.contact_name || "No existe data",
-            supplier.order_day || "No existe data",
-            supplier.delivery_day || "No existe data",
-            statusId,
-          ]
-        );
-      }
-    });
+    const idsToKeep = keepSupplierResult.rows.map((row) => row.supplier_id);
 
-    await Promise.all(insertSuppliers);
+    const deleteStockControlListsQuery =
+      "DELETE FROM products_stock_control_lists";
+    await client.query(deleteStockControlListsQuery);
 
-    // Commit la transaction
-    await pool.query("COMMIT");
+    const deleteProductsQuery = "DELETE FROM products";
+    await client.query(deleteProductsQuery);
 
-    res.status(201).send({ message: "Suppliers inserted successfully" });
-  } catch (error) {
-    // Rollback en cas d'erreur
-    await pool.query("ROLLBACK");
-    console.error(error);
-    res.status(500).send({ message: "Error inserting suppliers" });
-  }
-});
-
-router.get("/suppliersId", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM suppliers");
-    res.status(200).json(result.rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: "Error retrieving suppliers" });
-  }
-});
-
-router.post("/loadProduct", async (req, res) => {
-  const products = req.body; // Liste des produits avec leurs supplier_id
-
-  try {
-    // Commencez une transaction
-    await pool.query("BEGIN");
-
-    // Obtenez ou créez la catégorie par défaut
-    let defaultCategoryId;
-    const defaultCategoryResult = await pool.query(
-      "SELECT category_id FROM categories WHERE category_name = $1",
-      ["No existe data"]
-    );
-
-    if (defaultCategoryResult.rows.length > 0) {
-      defaultCategoryId = defaultCategoryResult.rows[0].category_id;
+    if (idsToKeep.length > 0) {
+      const deleteSuppliersQuery =
+        "DELETE FROM suppliers WHERE supplier_id <> ALL($1::int[])";
+      await client.query(deleteSuppliersQuery, [idsToKeep]);
     } else {
-      const insertCategoryResult = await pool.query(
-        `INSERT INTO categories (category_name, created_by, created_at)
-         VALUES ($1, $2, $3)
-         RETURNING category_id`,
-        ["No existe data", 1, new Date()] // Assurez-vous que created_by est un ID valide
-      );
-      defaultCategoryId = insertCategoryResult.rows[0].category_id;
+      const deleteSuppliersQuery = "DELETE FROM suppliers";
+      await client.query(deleteSuppliersQuery);
     }
 
-    // Préparez la requête d'insertion des produits
-    const queryText = `
-      INSERT INTO products (product_name, selling_price, purchase_price, stock, supplier_id, category_id, status_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `;
+    await client.query("COMMIT");
 
-    // Insérez les produits
-    const insertProducts = products.map(async (product) => {
-      // Assurez-vous que le status fourni existe dans la table status
-      const statusResult = await pool.query(
-        "SELECT status_id FROM status WHERE status = $1",
-        [product.status]
+    res.status(200).json({
+      message:
+        "Listas, productos y proveedores eliminados con éxito, excepto 'Proveedor no conocido'.",
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(error.message);
+    res.status(500).json({ error: "Error al suprimir los datos" });
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/insertSuppliers", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const statusResult = await client.query(
+      "SELECT status_id FROM status WHERE status = $1",
+      ["Activo"]
+    );
+    if (statusResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: 'Estado "Activo" no encontrado.' });
+    }
+    const activoStatusId = statusResult.rows[0].status_id;
+
+    const categorias = req.body.categorias;
+
+    const insertPromises = categorias.map((categoria) => {
+      return client.query(
+        "INSERT INTO suppliers (supplier_name, identification_number, address, phone, contact_name, order_day, delivery_day, status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        [
+          categoria,
+          0,
+          "no hay datos",
+          "no hay datos",
+          "no hay datos",
+          "no hay datos",
+          "no hay datos",
+          activoStatusId,
+        ]
       );
-      const statusId =
-        statusResult.rows.length > 0 ? statusResult.rows[0].status_id : null;
-
-      if (!statusId) {
-        throw new Error(`Status "${product.status}" not found`);
-      }
-
-      // Utilisez category_id ou defaultCategoryId
-      const categoryId = product.category_id || defaultCategoryId;
-
-      // Assurez-vous que les valeurs numériques ne sont pas vides ou incorrectes
-      const sellingPrice = product.selling_price
-        ? parseFloat(product.selling_price)
-        : 0;
-      const purchasePrice = product.purchase_price
-        ? parseFloat(product.purchase_price)
-        : 0;
-      const stock = product.stock ? parseInt(product.stock, 10) : 0;
-
-      return pool.query(queryText, [
-        product.product_name,
-        sellingPrice,
-        purchasePrice,
-        stock,
-        product.supplier_id,
-        categoryId,
-        statusId,
-      ]);
     });
 
-    await Promise.all(insertProducts);
+    await Promise.all(insertPromises);
 
-    // Commit de la transaction
-    await pool.query("COMMIT");
-
-    res.status(201).send({ message: "Products inserted successfully" });
+    res.status(201).json({ message: "Proveedores insertados con éxito" });
   } catch (error) {
-    // Rollback en cas d'erreur
-    await pool.query("ROLLBACK");
-    console.error(error);
-    res.status(500).send({ message: "Error inserting products" });
+    console.error("Error al insertar los proveedores:", error);
+    res.status(500).json({
+      message: "Error del servidor al insertar los proveedores.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/insertProducts", async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const statusResult = await client.query(
+      "SELECT status_id FROM status WHERE status = $1",
+      ["Activo"]
+    );
+    if (statusResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: 'Estado "Activo" no encontrado.' });
+    }
+    const activoStatusId = statusResult.rows[0].status_id;
+
+    const categoryResult = await client.query(
+      "SELECT category_id FROM categories WHERE category_name = $1",
+      ["No hay datos"]
+    );
+    if (categoryResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: 'Catégoría "No hay datos" no encontrada.' });
+    }
+    const noDataCategoryId = categoryResult.rows[0].category_id;
+
+    const products = req.body.products;
+
+    const insertPromises = products.map(async (product) => {
+      const supplierResult = await client.query(
+        "SELECT supplier_id FROM suppliers WHERE supplier_name = $1",
+        [product.supplier_name]
+      );
+      if (supplierResult.rows.length === 0) {
+        throw new Error(`Proveedor "${product.supplier_name}" no encontrado.`);
+      }
+      const supplierId = supplierResult.rows[0].supplier_id;
+
+      const sanitizedProduct = {
+        ...product,
+        stock: product.stock || 0,
+        purchase_price: product.purchase_price || 0.0,
+        selling_price: product.selling_price || 0.0,
+      };
+
+      return client.query(
+        "INSERT INTO products (product_name, supplier_id, category_id, stock, purchase_price, selling_price, status_id, from_search_page) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        [
+          sanitizedProduct.product_name,
+          supplierId,
+          noDataCategoryId,
+          sanitizedProduct.stock,
+          sanitizedProduct.purchase_price,
+          sanitizedProduct.selling_price,
+          activoStatusId,
+          false,
+        ]
+      );
+    });
+
+    await Promise.all(insertPromises);
+
+    res.status(201).json({ message: "Productos insertados con éxito" });
+  } catch (error) {
+    console.error("Error al insertar los productos :", error);
+    res
+      .status(500)
+      .json({ message: "Error del servidor al insertar los productos." });
+  } finally {
+    client.release();
   }
 });
 
